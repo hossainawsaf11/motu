@@ -1,5 +1,5 @@
 /* Network first so updates you push to GitHub show up right away; cache is the offline fallback. */
-const CACHE = 'motu-v1';
+const CACHE = 'motu-v2';
 const ASSETS = ['./', './index.html', './app.js', './seed.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -13,7 +13,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request).then(r => {
+    fetch(e.request, { cache: 'no-cache' }).then(r => {
       const copy = r.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy));
       return r;
