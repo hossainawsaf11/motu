@@ -388,7 +388,7 @@ function viewHome() {
   </div>
   <p class="coach">${coachLine(ws)}</p>`;
 
-  if (backupDays == null || backupDays > 14) h += `<button class="notice" data-act="export">${backupDays == null ? 'No backup yet.' : `Last backup ${backupDays} days ago.`} Your data lives only on this device. Tap to save a backup.</button>`;
+  if (backupDays == null || backupDays >= 7) h += `<button class="notice" data-act="export">${backupDays == null ? 'No backup yet.' : `Last backup ${backupDays} days ago.`} Your workouts live only on this phone. Tap to save a backup to Files.</button>`;
 
   // journey
   if (J.first) {
@@ -1064,10 +1064,17 @@ const ACT = {
   },
   tplDel: async () => { const id = tplDraft.id; if (!(await ask('Delete this template? Past sessions stay.', 'Delete', true))) return; S.templates = S.templates.filter(t => t.id !== id); save(); render(); },
   unit: t => { S.settings.unit = t.dataset.u; save(); settingsModal(); },
-  export: () => {
+  export: async () => {
+    const name = `motu-backup-${today()}.json`, text = JSON.stringify({ ...S, active: null }, null, 1);
+    let ok = false;
+    // On iPhone, the share sheet is the reliable way to save a file from a home-screen app
+    try {
+      const file = new File([text], name, { type: 'application/json' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Motu backup' }); ok = true; }
+    } catch (e) { if (e && e.name === 'AbortError') { toast('Backup not saved'); return; } }
+    if (!ok) download(name, text, 'application/json');
     S.settings.lastBackup = today(); save();
-    download(`motu-backup-${today()}.json`, JSON.stringify({ ...S, active: null }, null, 1), 'application/json');
-    toast('Backup downloaded'); if (tab === 'home' && $('#modal').hidden) render();
+    toast(ok ? 'Backup saved' : 'Backup downloaded'); if (tab === 'home' && $('#modal').hidden) render();
   },
   import: () => $('#importFile').click(),
   csv: () => {
