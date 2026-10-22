@@ -2,6 +2,7 @@
 /* Motu: a Push/Pull/Legs tracker. All data lives in this browser (localStorage).
    Back it up from Settings > Export. */
 
+const APP_VERSION = '1.3';
 const KEY = 'motu.v1';
 const OLD_KEYS = ['unstuck.v1', 'relentless.v1'];
 const VERSION = 1;
@@ -970,6 +971,7 @@ function settingsModal() {
     <div class="row2"><button class="btn" data-act="export">Export backup</button><button class="btn" data-act="import">Import backup</button></div>
     <button class="btn wide" data-act="csv">Export sets as CSV (for Sheets/Excel)</button>
     <input type="file" id="importFile" accept="application/json,.json" hidden>
+    <p class="muted sm center">Motu version ${APP_VERSION}</p>
     <button class="btn danger-text wide" data-act="reset">Reset everything to the imported sheet data</button>
   `, () => render());
 }
