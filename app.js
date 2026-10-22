@@ -41,7 +41,7 @@ function buildSeed() {
       id: t.id, day: t.day, name: t.name, focus: t.focus,
       exercises: t.ex.map(a => ({ name: a[0], sets: a[1], repMin: a[2], repMax: a[3], rest: a[4], optional: !!a[5], note: a[6] || '' }))
     })),
-    exTypes: { ...SEED.types }, sessions: [], weights: [], steps: {}, food: {}, active: null
+    exTypes: { ...SEED.types }, sessions: [], weights: [], steps: {}, exUnits: {}, food: {}, active: null
   };
   // Sessions in the order they were trained, then dated from the Strong calendar
   const order = [{ t: 'd1', unlogged: true }, { t: null, unlogged: true, name: 'Extra workout' }];
@@ -67,6 +67,7 @@ function migrate(s) {
   s.sessions = s.sessions || [];
   s.weights = s.weights || [];
   s.steps = s.steps || {};
+  s.exUnits = s.exUnits || {};
   s.food = s.food || {};
   if (s.active === undefined) s.active = null;
   if ((s.seedV || 1) < 5) { // re-date imported sessions from the Strong calendar, keep anything logged in the app
@@ -94,6 +95,9 @@ const unit = () => S.settings.unit;
 const trim = n => (Math.round(n * 100) / 100).toString();
 function dispW(kg) { if (kg === '' || kg == null) return ''; return unit() === 'lb' ? trim(Math.round(kg * LB * 2) / 2) : trim(kg); }
 function toKg(v) { if (isNaN(v)) return ''; return unit() === 'lb' ? v / LB : v; }
+function dispWU(kg, u) { if (kg === '' || kg == null) return ''; return u === 'lb' ? trim(Math.round(kg * LB * 2) / 2) : trim(Math.round(kg * 100) / 100); }
+function toKgU(v, u) { if (isNaN(v)) return ''; return u === 'lb' ? v / LB : v; }
+const exUnit = name => (S.exUnits && S.exUnits[name]) || S.settings.unit;
 function dispR(kg) { const v = unit() === 'lb' ? Math.round(kg * LB) : Math.round(kg * 2) / 2; return trim(v); }
 const fmtSet = s => `${s.w > 0 ? dispW(s.w) : 'BW'} × ${s.r}`;
 function fmtVol(kg) { const v = unit() === 'lb' ? kg * LB : kg; return Math.round(v).toLocaleString() + ' ' + unit(); }
@@ -182,23 +186,23 @@ function nextTemplate() {
 }
 
 /* progression: double progression on the rep range */
-function incKg(name) {
+function incKg(name, u = unit()) {
   const t = exType(name);
-  if (unit() === 'lb') return 5 / LB;
+  if (u === 'lb') return 5 / LB;
   return t === 'dumbbell' ? 2 : 2.5;
 }
-function suggestion(e, last) {
+function suggestion(e, last, u = unit()) {
   if (!last) return { kind: 'new', text: `First time. Pick a weight you can move for ${e.repMin} to ${e.repMax} clean reps.` };
   const sets = last.sets, top = Math.max(...sets.map(s => s.w));
   const reps = sets.map(s => s.r).join(' / ');
   if (top <= 0) return { kind: 'hold', w: 0, r: Math.max(...sets.map(s => s.r)) + 1, text: `Last time: ${reps}. Beat it by one rep somewhere.` };
   const allTop = sets.length >= Math.min(e.sets || 3, 3) && sets.every(s => s.r >= e.repMax);
   if (allTop) {
-    const nw = top + incKg(e.name);
-    return { kind: 'up', w: nw, r: e.repMin, text: `Earned it. Go ${dispW(nw)} ${unit()} for ${e.repMin}+ reps.` };
+    const nw = top + incKg(e.name, u);
+    return { kind: 'up', w: nw, r: e.repMin, text: `Earned it. Go ${dispWU(nw, u)} ${u} for ${e.repMin}+ reps.` };
   }
   const minR = Math.min(...sets.filter(s => s.w === top).map(s => s.r));
-  return { kind: 'hold', w: top, r: Math.min(minR + 1, e.repMax), text: `Stay at ${dispW(top)} ${unit()}. Last: ${reps}. Every set to ${e.repMax}, then add weight.` };
+  return { kind: 'hold', w: top, r: Math.min(minR + 1, e.repMax), text: `Stay at ${dispWU(top, u)} ${u}. Last: ${reps}. Every set to ${e.repMax}, then add weight.` };
 }
 
 /* ---------------- UI helpers ---------------- */
@@ -577,7 +581,8 @@ function viewActive() {
   const a = S.active;
   let h = `<div class="aw-head">
     <div class="aw-title"><input class="aw-name" data-in="aname" value="${esc(a.name)}" aria-label="Workout name">
-      <div class="aw-meta"><span class="clock">${ICON.clock}<b id="elapsed">${a.editId ? 'editing' : elapsed()}</b></span><input type="date" class="datein" data-in="adate" value="${a.date}"></div></div>
+      <div class="aw-meta"><span class="clock">${ICON.clock}<b id="elapsed">${a.editId ? 'editing' : elapsed()}</b></span><input type="date" class="datein" data-in="adate" value="${a.date}"></div>
+      <div class="useg" role="group" aria-label="Weight unit for this workout">${['kg', 'lb'].map(x => `<button class="${S.settings.unit === x && a.exercises.every(e => exUnit(e.name) === x) ? 'on' : ''}" data-act="woUnit" data-u="${x}">${x}</button>`).join('')}<span>all exercises</span></div></div>
     <button class="btn green" data-act="finish">${a.editId ? 'Save' : 'Finish'}</button>
   </div>`;
   a.exercises.forEach((e, i) => { h += exCard(e, i); });
@@ -593,22 +598,22 @@ function viewActive() {
 }
 
 function exCard(e, i) {
-  const a = S.active, last = lastPerf(e.name, a.editId), sug = suggestion(e, last);
+  const a = S.active, last = lastPerf(e.name, a.editId), u = exUnit(e.name), sug = suggestion(e, last, u);
   const prior = bestE1(e.name, a.editId), type = exType(e.name);
   let running = prior;
   const rows = e.sets.map((s, j) => {
     const p = last ? last.sets[j] : null;
     let phW, phR;
-    if (sug.kind === 'up') { phW = dispW(sug.w); phR = sug.r; }
-    else if (p) { phW = dispW(p.w); phR = p.r; }
-    else if (last) { const l = last.sets[last.sets.length - 1]; phW = dispW(l.w); phR = l.r; }
+    if (sug.kind === 'up') { phW = dispWU(sug.w, u); phR = sug.r; }
+    else if (p) { phW = dispWU(p.w, u); phR = p.r; }
+    else if (last) { const l = last.sets[last.sets.length - 1]; phW = dispWU(l.w, u); phR = l.r; }
     else { phW = ''; phR = e.repMin || ''; }
     let pr = false;
     if (s.done) { const v = e1rm(+s.w || 0, +s.r || 0); if (prior > 0 && v > running) { pr = true; running = v; } }
     return `<div class="set ${s.done ? 'done' : ''}">
       <span class="sn">${j + 1}</span>
-      <button class="prev" data-act="copyPrev" data-i="${i}" data-j="${j}">${p ? fmtSet(p) : '-'}</button>
-      <input class="in" inputmode="decimal" data-in="w" data-i="${i}" data-j="${j}" value="${s.w === '' ? '' : dispW(s.w)}" placeholder="${phW}">
+      <button class="prev" data-act="copyPrev" data-i="${i}" data-j="${j}">${p ? (p.w > 0 ? dispWU(p.w, u) + ' ' + u : 'BW') + ' × ' + p.r : '-'}</button>
+      <input class="in" inputmode="decimal" data-in="w" data-u="${u}" data-i="${i}" data-j="${j}" value="${s.w === '' ? '' : dispWU(s.w, u)}" placeholder="${phW}">
       <input class="in" inputmode="numeric" data-in="r" data-i="${i}" data-j="${j}" value="${s.r}" placeholder="${phR}">
       <button class="chk" data-act="check" data-i="${i}" data-j="${j}" aria-label="Complete set">${pr ? ICON.trophy : ICON.check}</button>
     </div>`;
@@ -619,8 +624,9 @@ function exCard(e, i) {
       <div class="muted sm">${range} · rest ${fmtRest(e.rest)}${e.optional ? ' · optional' : ''}${e.tnote ? ' · ' + esc(e.tnote) : ''}</div></div>
       <button class="icon sm" data-act="exMenu" data-i="${i}" aria-label="Exercise options">${ICON.dots}</button></div>
     <div class="sug ${sug.kind}">${sug.kind === 'up' ? ICON.up : ''}${esc(sug.text)}</div>
+    ${last && Math.max(...last.sets.map(x => x.w)) > 0 ? (() => { const top = Math.max(...last.sets.map(x => x.w)); return `<div class="conv">Last top set: <b>${dispWU(top, 'kg')} kg</b> = <b>${dispWU(top, 'lb')} lb</b></div>`; })() : ''}
     ${e.showNote || e.note ? `<textarea class="field note" rows="1" data-in="exnote" data-i="${i}" placeholder="Note for this exercise">${esc(e.note)}</textarea>` : ''}
-    <div class="set head"><span>Set</span><span>Previous</span><span>${unit()}</span><span>Reps</span><span></span></div>
+    <div class="set head"><span>Set</span><span>Previous</span><span><button class="unitbtn" data-act="exUnit" data-i="${i}" aria-label="Switch ${esc(e.name)} to ${u === 'kg' ? 'lb' : 'kg'}">${u} ${ICON.swap}</button></span><span>Reps</span><span></span></div>
     ${rows}
     <div class="ex-f"><button class="link" data-act="addSet" data-i="${i}">+ Add set</button>${e.sets.length ? `<button class="link muted" data-act="delSet" data-i="${i}">Remove last</button>` : ''}${type === 'barbell' ? `<button class="link muted" data-act="plates" data-i="${i}">Plates</button>` : ''}</div>
   </div>`;
@@ -1002,7 +1008,7 @@ const ACT = {
     const i = +t.dataset.i, j = +t.dataset.j, e = S.active.exercises[i], s = e.sets[j];
     if (s.done) { s.done = false; save(); render(); return; }
     const row = t.closest('.set'), wi = row.querySelector('[data-in=w]'), ri = row.querySelector('[data-in=r]');
-    if (s.w === '') { const v = parseFloat(wi.placeholder); s.w = isNaN(v) ? 0 : toKg(v); }
+    if (s.w === '') { const v = parseFloat(wi.placeholder); s.w = isNaN(v) ? 0 : toKgU(v, wi.dataset.u || unit()); }
     if (s.r === '') { const v = parseInt(ri.placeholder, 10); if (isNaN(v)) { toast('Enter reps first'); ri.focus(); return; } s.r = v; }
     const prior = bestE1(e.name, S.active.editId);
     const doneBefore = e.sets.filter(x => x.done).reduce((m, x) => Math.max(m, e1rm(+x.w || 0, +x.r || 0)), 0);
@@ -1011,6 +1017,18 @@ const ACT = {
     if (prior > 0 && v > Math.max(prior, doneBefore)) toast(`New record: ${e.name}, est. 1RM ${dispR(v)} ${unit()}`, 3000);
     const remaining = e.sets.some(x => !x.done);
     startRest(remaining ? (e.rest || 90) : Math.min(e.rest || 90, 120));
+  },
+  exUnit: t => {
+    S.exUnits = S.exUnits || {};
+    const e = S.active.exercises[+t.dataset.i], next = exUnit(e.name) === 'kg' ? 'lb' : 'kg';
+    if (next === S.settings.unit) delete S.exUnits[e.name]; else S.exUnits[e.name] = next;
+    save(); render(); toast(`${e.name} now in ${next}`);
+  },
+  woUnit: t => {
+    S.exUnits = S.exUnits || {};
+    const u = t.dataset.u; S.settings.unit = u;
+    for (const e of S.active.exercises) delete S.exUnits[e.name];
+    save(); render(); toast(`All weights in ${u}`);
   },
   copyPrev: t => {
     const i = +t.dataset.i, j = +t.dataset.j, e = S.active.exercises[i], last = lastPerf(e.name, S.active.editId);
@@ -1036,7 +1054,7 @@ const ACT = {
   exReplace: t => addExerciseModal(+t.dataset.i),
   exMove: t => { const i = +t.dataset.i, d = +t.dataset.d, a = S.active.exercises; [a[i], a[i + d]] = [a[i + d], a[i]]; save(); closeModal(); render(); },
   exRemove: t => { S.active.exercises.splice(+t.dataset.i, 1); save(); closeModal(); render(); },
-  plates: t => { const e = S.active.exercises[+t.dataset.i]; const s = e.sets.find(x => !x.done) || e.sets[e.sets.length - 1]; let kg = s && s.w !== '' ? s.w : null; if (kg == null) { const row = $$(`.ex`)[+t.dataset.i]; const ph = row && row.querySelector('[data-in=w]'); kg = ph && ph.placeholder ? toKg(parseFloat(ph.placeholder)) : null; } platesModal(kg); },
+  plates: t => { const e = S.active.exercises[+t.dataset.i]; const s = e.sets.find(x => !x.done) || e.sets[e.sets.length - 1]; let kg = s && s.w !== '' ? s.w : null; if (kg == null) { const row = $$(`.ex`)[+t.dataset.i]; const ph = row && row.querySelector('[data-in=w]'); kg = ph && ph.placeholder ? toKgU(parseFloat(ph.placeholder), ph.dataset.u || unit()) : null; } platesModal(kg); },
   restAdj: t => { if (!rest.end) return; rest.end += +t.dataset.d * 1000; rest.total = Math.max(rest.total + +t.dataset.d * 1000, 1000); tickRest(); },
   restSkip: () => stopRest(),
   openSess: t => openSession(t.dataset.id),
@@ -1096,7 +1114,7 @@ document.addEventListener('click', e => {
 });
 
 const IN = {
-  w: t => { const s = S.active.exercises[t.dataset.i].sets[t.dataset.j]; const v = parseFloat(t.value); s.w = t.value.trim() === '' || isNaN(v) ? '' : toKg(v); saveSoon(); },
+  w: t => { const s = S.active.exercises[t.dataset.i].sets[t.dataset.j]; const v = parseFloat(t.value); s.w = t.value.trim() === '' || isNaN(v) ? '' : toKgU(v, t.dataset.u || unit()); saveSoon(); },
   r: t => { const s = S.active.exercises[t.dataset.i].sets[t.dataset.j]; const v = parseInt(t.value, 10); s.r = isNaN(v) ? '' : v; saveSoon(); },
   aname: t => { S.active.name = t.value; saveSoon(); },
   adate: t => { if (t.value) { S.active.date = t.value; saveSoon(); } },
@@ -1140,6 +1158,7 @@ const ICON = {
   clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   dots: '<svg viewBox="0 0 24 24" class="fill"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
   x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  swap: '<svg viewBox="0 0 24 24"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>',
   edit: '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/></svg>',
   up: '<svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>'
 };
