@@ -2,7 +2,7 @@
 /* Motu: a Push/Pull/Legs tracker. All data lives in this browser (localStorage).
    Back it up from Settings > Export. */
 
-const APP_VERSION = '1.3';
+const APP_VERSION = '1.4';
 const KEY = 'motu.v1';
 const OLD_KEYS = ['unstuck.v1', 'relentless.v1'];
 const VERSION = 1;

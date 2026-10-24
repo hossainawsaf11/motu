@@ -1,6 +1,6 @@
 /* Network first so updates you push to GitHub show up right away; cache is the offline fallback. */
-const CACHE = 'motu-v3';
-const ASSETS = ['./', './index.html', './app.js', './seed.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+const CACHE = 'motu-v4';
+const ASSETS = ['./', './index.html', './app.js', './seed.js', './sync.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -11,7 +11,9 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
+  const u = new URL(e.request.url);
+  if (e.request.method !== 'GET') return;
+  if (u.origin !== location.origin && !(u.hostname === 'www.gstatic.com' && u.pathname.startsWith('/firebasejs/'))) return;
   e.respondWith(
     fetch(e.request, { cache: 'no-cache' }).then(r => {
       const copy = r.clone();
