@@ -308,7 +308,12 @@ function ringSVG(frac, color, size = 60, track = '#EEF1EC') {
 }
 
 /* ---------------- HOME ---------------- */
-const KIND = s => { const n = (s.name || '').toLowerCase(); return n.includes('push') ? 'push' : n.includes('pull') ? 'pull' : n.includes('leg') ? 'legs' : 'other'; };
+const KIND0 = name => { const n = (name || '').toLowerCase(); return n.includes('push') ? 'push' : n.includes('pull') ? 'pull' : n.includes('leg') ? 'legs' : 'other'; };
+const PAL = ['push', 'pull', 'legs', 'k3', 'k4', 'k5'];
+const isPPL = () => S.templates.length > 0 && S.templates.every(t => KIND0(t.name) !== 'other');
+const KIND = s => { if (isPPL()) return KIND0(s.name); const i = S.templates.findIndex(t => t.id === s.templateId); const j = i >= 0 ? i : S.templates.findIndex(t => t.name === s.name); return j >= 0 ? PAL[j % PAL.length] : 'other'; };
+const legendHTML = () => isPPL() ? '<span><i class="day push"></i>Push</span><span><i class="day pull"></i>Pull</span><span><i class="day legs"></i>Legs</span>'
+  : S.templates.map((t, i) => `<span><i class="day ${PAL[i % PAL.length]}"></i>${esc(t.name)}</span>`).join('');
 const DLABEL = s => { const t = tmpl(s.templateId); return t && t.day ? 'D' + t.day : '+'; };
 function sessionsByDay() { const m = {}; for (const s of sorted()) (m[s.date] = m[s.date] || []).push(s); return m; }
 
@@ -456,7 +461,7 @@ function viewHome() {
       else chip = `<span class="wchip ${d > td ? 'future' : 'rest'}"></span>`;
       return `<div class="wcol"><span class="wday ${d === td ? 'now' : ''}">${dn}</span>${chip}</div>`;
     }).join('')}</div>
-    <div class="legend"><span><i class="day push"></i>Push</span><span><i class="day pull"></i>Pull</span><span><i class="day legs"></i>Legs</span></div>
+    <div class="legend">${legendHTML()}</div>
     <div class="muted sm">You don't need every day. ${st.streakThreshold} workouts makes it a win week.</div>
   </div>`;
 
@@ -494,7 +499,7 @@ function viewHome() {
       return `<i class="day ${d > td ? 'future' : 'rest'}${d === td ? ' today' : ''}" title="${fmtDate(d)}"></i>`;
     }).join('')}<span class="n ${Wk.cls}" title="${Wk.status}">${Wk.count}</span></div>`).join('')}
     </div>
-    <div class="legend"><span><i class="day push"></i>Push</span><span><i class="day pull"></i>Pull</span><span><i class="day legs"></i>Legs</span><span class="muted">${st.streakThreshold}+ a week keeps the streak</span></div>
+    <div class="legend">${legendHTML()}<span class="muted">${st.streakThreshold}+ a week keeps the streak</span></div>
   </div>`;
   return h;
 }
