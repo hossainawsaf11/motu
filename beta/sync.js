@@ -61,6 +61,33 @@
     const userRef = db.collection(ROOT).doc(uid);
     const [metaSnap, sessSnap] = await Promise.all([userRef.get(), userRef.collection('sessions').get()]);
     const cloudSessions = {}; sessSnap.forEach(d => { cloudSessions[d.id] = d.data(); });
+
+    // this phone holds someone else's data (another account was signed in here): never mix it in
+    let prevOwner = S.owner || null;
+    if (!prevOwner) { try { const v = JSON.parse(localStorage.getItem(ID_KEY) || 'null'); if (v && v.uid) prevOwner = v.uid; } catch (e) { } }
+    if (prevOwner && prevOwner !== uid) {
+      const cm = metaSnap.exists ? readMeta(metaSnap.data()) : null;
+      const keepBackup = S.settings.lastBackup;
+      S = buildFresh(); S.owner = uid;
+      if (cm || Object.keys(cloudSessions).length) {
+        delete S.fresh;
+        if (cm) for (const k of META_KEYS) if (k in cm) S[k] = cm[k] ?? (k === 'profile' || k === 'planName' ? null : S[k]);
+        if (cm && cm.settings) S.settings = { ...buildFresh().settings, ...cm.settings };
+        S.sessions = Object.values(cloudSessions);
+        S.settings.lastBackup = keepBackup;
+      }
+      if (typeof migrate === 'function') S = migrate(S);
+      S.owner = uid;
+      localSave();
+      for (const s of S.sessions) synced.sessions[s.id] = stable(clean(s));
+      synced.meta = stable(metaOf());
+      rememberIds(); ready = true; SY.lastSync = new Date(); setState('synced');
+      const ob = document.querySelector('#onboard');
+      if (S.fresh) { if (typeof onboard === 'function') onboard(); }
+      else if (ob) { ob.hidden = true; ob.innerHTML = ''; document.body.classList.remove('noscroll'); }
+      safeRender();
+      return 0;
+    }
     const cloudKeys = new Set(Object.values(cloudSessions).map(sessKey).filter(Boolean));
 
     // sessions: union by id; seeded history is matched by date + name so it never doubles up
@@ -82,6 +109,7 @@
       S.steps = { ...(local.steps || {}), ...(cm.steps || {}) };
     }
     S.sessions = Object.values(merged);
+    S.owner = uid;
     if (S.fresh && (S.sessions.length || cmRead)) { delete S.fresh; const ob = document.querySelector('#onboard'); if (ob) { ob.hidden = true; ob.innerHTML = ''; document.body.classList.remove('noscroll'); } }
     localSave();
 

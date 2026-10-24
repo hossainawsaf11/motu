@@ -1274,7 +1274,8 @@ const ACT = {
   },
   wipeHistory: async () => {
     const n = S.sessions.length;
-    if (!(await ask(`Delete all ${n} workouts, weigh-ins except the latest, steps and weight checkpoints from this account? Your plan, name and settings stay. This can't be undone.`, 'Delete history', true))) return settingsModal();
+    const acct = window.MotuSync && MotuSync.user ? ` from the account ${MotuSync.user.email}` : ' from this phone';
+    if (!(await ask(`Make sure this is the right person's account. Delete all ${n} workouts${acct}, plus weigh-ins except the latest, steps and weight checkpoints? Your plan, name and settings stay. This can't be undone.`, 'Delete history', true))) return settingsModal();
     const lw = latestWeight();
     S.sessions = []; S.active = null; S.steps = {}; S.exUnits = {};
     S.weights = lw ? [{ date: lw.date, kg: lw.kg }] : [];
