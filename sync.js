@@ -80,6 +80,7 @@
       S.steps = { ...(local.steps || {}), ...(cm.steps || {}) };
     }
     S.sessions = Object.values(merged);
+    if (S.fresh && (S.sessions.length || cmRead)) { delete S.fresh; const ob = document.querySelector('#onboard'); if (ob) { ob.hidden = true; ob.innerHTML = ''; document.body.classList.remove('noscroll'); } }
     localSave();
 
     // upload anything the cloud doesn't have yet

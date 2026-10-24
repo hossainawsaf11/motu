@@ -2,7 +2,7 @@
 /* Motu: a Push/Pull/Legs tracker. All data lives in this browser (localStorage).
    Back it up from Settings > Export. */
 
-const APP_VERSION = '1.5';
+const APP_VERSION = '1.6';
 const KEY = 'motu.v1';
 const OLD_KEYS = ['unstuck.v1', 'relentless.v1'];
 const VERSION = 1;
@@ -77,9 +77,16 @@ function migrate(s) {
   return s;
 }
 
+function buildFresh() {
+  const s = buildSeed();
+  s.sessions = []; s.weights = []; s.steps = {}; s.exUnits = {};
+  s.settings = { ...s.settings, name: '', startDate: mondayOf(today()), milestones: [], goalWeight: 0, lastBackup: null, comebackSeen: null };
+  s.fresh = true;
+  return s;
+}
 function load() {
   try { const raw = localStorage.getItem(KEY) || OLD_KEYS.map(k => localStorage.getItem(k)).find(Boolean); if (raw) return migrate(JSON.parse(raw)); } catch (e) { }
-  return buildSeed();
+  return buildFresh();
 }
 let S = load();
 function save() {
@@ -464,6 +471,29 @@ function viewHome() {
   </div>`;
   return h;
 }
+
+/* first open on a new device: a short setup */
+let obUnit = 'kg';
+function onboard() {
+  if (!S.fresh) return;
+  const el = $('#onboard'); if (!el) return;
+  el.innerHTML = `<div class="ob">
+    <div class="obfig">${figureSVG(0, 132)}</div>
+    <h1>Welcome to motu</h1>
+    <p>Every motu has a comeback. Set up in 30 seconds.</p>
+    <label class="lbl">Your first name<input class="field" id="obName" autocomplete="given-name"></label>
+    <div class="lbl">Weight unit</div>
+    <div class="seg">${['kg', 'lb'].map(u => `<button class="${obUnit === u ? 'on' : ''}" data-act="obUnit" data-u="${u}">${u}</button>`).join('')}</div>
+    <div class="row2"><label>Weight now (${obUnit})<input class="field" id="obNow" inputmode="decimal"></label><label>Goal weight (${obUnit})<input class="field" id="obGoal" inputmode="decimal"></label></div>
+    <div class="lbl">Workouts a week you can commit to</div>
+    <div class="seg" id="obDays">${[3, 4, 5, 6].map(d => `<button class="${d === 4 ? 'on' : ''}" data-act="obDays" data-d="${d}">${d}</button>`).join('')}</div>
+    <p class="muted sm">You'll follow a Push, Pull, Legs rotation. Hitting your number in a week counts as a win, and you can edit the workouts anytime.</p>
+    <button class="btn primary big" data-act="obStart">Start</button>
+    <button class="quick dark" data-act="obSignIn">I already have an account</button>
+  </div>`;
+  el.hidden = false; document.body.classList.add('noscroll');
+}
+function closeOnboard() { const el = $('#onboard'); if (el) { el.hidden = true; el.innerHTML = ''; } document.body.classList.remove('noscroll'); }
 
 /* welcome back: shown once after a gap of 5+ days */
 function maybeComeback() {
@@ -972,7 +1002,7 @@ function settingsModal() {
     <button class="btn wide" data-act="csv">Export sets as CSV (for Sheets/Excel)</button>
     <input type="file" id="importFile" accept="application/json,.json" hidden>
     <p class="muted sm center">Motu version ${APP_VERSION}</p>
-    <button class="btn danger-text wide" data-act="reset">Reset everything to the imported sheet data</button>
+    <button class="btn danger-text wide" data-act="reset">Erase this device and start fresh</button>
   `, () => render());
 }
 
@@ -989,6 +1019,22 @@ const ACT = {
   settings: () => settingsModal(),
   start: t => startWorkout(t.dataset.id),
   startQuick: t => startWorkout(t.dataset.id, null, true),
+  obUnit: t => { const keep = { n: $('#obName').value, a: $('#obNow').value, g: $('#obGoal').value }; obUnit = t.dataset.u; onboard(); $('#obName').value = keep.n; $('#obNow').value = keep.a; $('#obGoal').value = keep.g; },
+  obDays: t => { document.querySelectorAll('#obDays button').forEach(b => b.classList.toggle('on', b === t)); },
+  obStart: () => {
+    const name = $('#obName').value.trim(), now = parseFloat($('#obNow').value), goal = parseFloat($('#obGoal').value);
+    const days = +((document.querySelector('#obDays button.on') || {}).dataset || {}).d || 4;
+    if (!name) { toast('Add your first name'); $('#obName').focus(); return; }
+    if (!(now > 0)) { toast('Add your weight now'); $('#obNow').focus(); return; }
+    const k = v => obUnit === 'lb' ? Math.round(v / LB * 10) / 10 : v;
+    S.settings.name = name; S.settings.unit = obUnit;
+    S.settings.weeklyTarget = days; S.settings.streakThreshold = Math.min(days, 4);
+    S.settings.goalWeight = goal > 0 ? k(goal) : Math.round(k(now) * 0.9);
+    S.weights = [{ date: today(), kg: k(now) }];
+    delete S.fresh; save(); closeOnboard(); go('home');
+    toast(`Welcome, ${name}. Your first workout is ready.`);
+  },
+  obSignIn: () => { delete S.fresh; save(); closeOnboard(); settingsModal(); },
   editSteps: async () => {
     const v = await askText('Steps today', S.steps[today()] ?? '');
     if (v === null) return;
@@ -1102,7 +1148,7 @@ const ACT = {
     for (const s of sorted()) s.exercises.forEach(e => e.sets.forEach((x, j) => rows.push([s.date, weekNo(s.date), s.name, e.name, j + 1, trim(x.w), x.r, trim(e1rm(x.w, x.r)), trim(x.w * x.r)])));
     download(`motu-sets-${today()}.csv`, rows.map(r => r.map(c => /[",]/.test(String(c)) ? `"${String(c).replace(/"/g, '""')}"` : c).join(',')).join('\n'), 'text/csv');
   },
-  reset: async () => { if (!(await ask('Wipe everything and go back to the data imported from your sheet? Export a backup first if unsure.', 'Reset', true))) return; S = buildSeed(); save(); go('home'); },
+  reset: async () => { if (!(await ask('Erase everything on this device and start fresh? If you are signed in, your account keeps its copy. Export a backup first if unsure.', 'Erase', true))) return; S = buildFresh(); save(); go('home'); onboard(); },
   askOk: () => { const i = $('#askIn'); const v = i ? i.value : true; const r = askResolve; askResolve = null; closeModal(); if (r) r(v); },
   askNo: () => closeModal()
 };
@@ -1169,4 +1215,5 @@ const ICON = {
 render();
 if (S.active) wake();
 splash();
+onboard();
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });

@@ -374,6 +374,17 @@ details.card summary::after{content:' ▾';color:var(--faint)}
 .syncard .btn:not(.primary){background:var(--card)}
 .syncok{display:flex;flex-direction:column;gap:2px;margin-bottom:6px}
 .syerr{color:var(--red);font-size:13.5px;font-weight:600;margin:6px 2px}
+
+/* ---- onboarding ---- */
+#onboard{position:fixed;inset:0;z-index:75;background:var(--bg);overflow-y:auto}
+#onboard[hidden]{display:none}
+.ob{max-width:480px;margin:0 auto;box-sizing:border-box;display:flex;flex-direction:column;gap:6px;padding:calc(var(--safe-t) + 36px) max(20px,env(safe-area-inset-right,0px)) calc(var(--safe-b) + 32px) max(20px,env(safe-area-inset-left,0px))}
+.obfig{display:flex;justify-content:center}
+.ob h1{font-size:32px;font-weight:800;text-align:center}
+.ob>p{text-align:center;margin:0 0 6px;color:var(--muted);font-weight:600}
+.ob .btn.big{margin-top:10px;box-shadow:none}
+.ob .field{background:var(--card)}
+.ob .seg{background:#E6EAE5}
 </style>
 </head>
 <body>
@@ -389,13 +400,14 @@ details.card summary::after{content:' ▾';color:var(--faint)}
 </div></nav>
 <div id="modal" hidden></div>
 <div id="comeback" hidden></div>
+<div id="onboard" hidden></div>
 <div id="splash"><div class="splfig"></div><div class="spln">motu</div><div class="splt">Every motu has a comeback.</div></div>
 <div id="toast"></div>
-<script src="seed.js?v=1.5"></script>
-<script src="app.js?v=1.5"></script>
+<script src="seed.js?v=1.6"></script>
+<script src="app.js?v=1.6"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="sync.js?v=1.5"></script>
+<script src="sync.js?v=1.6"></script>
 </body>
 </html>
