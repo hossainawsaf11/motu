@@ -1,5 +1,5 @@
 /* Network first so updates you push to GitHub show up right away; cache is the offline fallback. */
-const CACHE = 'motu-beta-b1';
+const CACHE = 'motu-beta-b2';
 const ASSETS = ['./', './index.html', './app.js', './seed.js', './library.js', './sync.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {

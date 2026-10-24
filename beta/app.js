@@ -1178,6 +1178,7 @@ function settingsModal() {
     <button class="btn wide" data-act="csv">Export sets as CSV (for Sheets/Excel)</button>
     <input type="file" id="importFile" accept="application/json,.json" hidden>
     <p class="muted sm center">Motu version ${APP_VERSION}</p>
+    <button class="btn danger-text wide" data-act="wipeHistory">Clear workout history, keep my plan</button>
     <button class="btn danger-text wide" data-act="reset">Erase this device and start fresh</button>
   `, () => render());
 }
@@ -1240,6 +1241,15 @@ const ACT = {
     d.name = S.settings.name || ''; d.unit = u; d.gender = P.gender || ''; d.goals = P.goals || [];
     if (lw) d.now = String(u === 'lb' ? Math.round(lw.kg * LB * 10) / 10 : lw.kg);
     onboard();
+  },
+  wipeHistory: async () => {
+    const n = S.sessions.length;
+    if (!(await ask(`Delete all ${n} workouts, weigh-ins except the latest, steps and weight checkpoints from this account? Your plan, name and settings stay. This can't be undone.`, 'Delete history', true))) return settingsModal();
+    const lw = latestWeight();
+    S.sessions = []; S.active = null; S.steps = {}; S.exUnits = {};
+    S.weights = lw ? [{ date: lw.date, kg: lw.kg }] : [];
+    S.settings.milestones = []; S.settings.startDate = mondayOf(today()); S.settings.comebackSeen = null;
+    save(); closeModal(); go('home'); toast('History cleared. Fresh start.');
   },
   nudgeOff: () => { S.settings.setupNudgeOff = true; save(); render(); },
   figure: t => { S.profile = Object.assign({}, S.profile || {}, { gender: t.dataset.v }); save(); settingsModal(); render(); },
