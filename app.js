@@ -2,7 +2,7 @@
 /* Motu: a Push/Pull/Legs tracker. All data lives in this browser (localStorage).
    Back it up from Settings > Export. */
 
-const APP_VERSION = '2.0.2';
+const APP_VERSION = '2.0.3';
 const ENV = window.MOTU_ENV || {};
 const KEY = ENV.key || 'motu.v1';
 const OLD_KEYS = ENV.key ? [] : ['unstuck.v1', 'relentless.v1'];
@@ -349,8 +349,28 @@ const BODY = [
   ['L', [99, 166], [99, 152], [99, 157]],
   ['L', [100, 164], [100, 148], [100, 153]]
 ];
+// women: [start (soft, straight waist), goal (snatched waist, fuller hips and glutes)]
+const FEM = [
+  ['M', [92, 62], [93, 62]],
+  ['L', [91, 70], [93, 70]],
+  ['C', [84, 72, 75, 74, 70, 80], [86, 72, 80, 73, 76, 79]],
+  ['C', [63, 85, 61, 93, 62, 101], [69, 83, 68, 91, 68, 99]],
+  ['L', [61, 133], [63, 131]],
+  ['Q', [60, 141, 64, 141], [61, 138, 65, 138]],
+  ['Q', [69, 141, 69, 134], [68, 138, 68, 131]],
+  ['L', [70, 107], [72, 106]],
+  ['Q', [71, 102, 74, 104], [74, 101, 77, 104]],
+  ['C', [76, 112, 78, 120, 78, 127], [78, 112, 84, 116, 84, 125]],
+  ['C', [78, 134, 77, 146, 78, 152], [84, 132, 72, 136, 72, 148]],
+  ['C', [79, 160, 84, 168, 86, 176], [72, 159, 82, 167, 85, 176]],
+  ['Q', [86, 180, 90, 180], [85, 180, 89, 180]],
+  ['L', [95, 180], [95, 180]],
+  ['Q', [98, 180, 98, 176], [98, 180, 98, 176]],
+  ['L', [99, 156], [97, 157]],
+  ['L', [100, 153], [100, 152]]
+];
 function bodyPath(t, female) {
-  const segs = BODY.map(([c, h, f, w]) => { const fit = female && w ? w : f; return [c, h.map((v, i) => v + (fit[i] - v) * t)]; });
+  const segs = female ? FEM.map(([c, a, b]) => [c, a.map((v, i) => v + (b[i] - v) * t)]) : BODY.map(([c, h, f]) => [c, h.map((v, i) => v + (f[i] - v) * t)]);
   const n = v => Math.round(v * 10) / 10, end = s => s[1].slice(-2), mx = x => 200 - x;
   let d = segs.map(([c, p]) => c + p.map(n).join(' ')).join(' ');
   for (let i = segs.length - 1; i >= 1; i--) {
@@ -628,10 +648,13 @@ function splash() {
   let done = false;
   const finish = () => { if (done) return; done = true; el.classList.add('out'); setTimeout(() => { el.remove(); maybeComeback(); }, 380); };
   el.addEventListener('click', finish);
-  if (reduce || strong) {
+  const nm = (S.settings.name || '').trim(), fem = isFemale(), cutu = /^fabiha/i.test(nm);
+  const strongLine = `Strong looks good on you${nm ? ', ' + nm : ''}.`;
+  if (reduce || (strong && !fem)) {
     fig.innerHTML = figureSVG(strong ? 1 : target, 150);
-    if (strong) { const nm = (S.settings.name || '').trim(); setTimeout(() => { line.style.opacity = 0; setTimeout(() => { line.textContent = `Strong looks good on you${nm ? ', ' + nm : ''}.`; line.style.opacity = 1; }, 160); }, 500); }
-    setTimeout(finish, strong ? 2000 : 600); return;
+    const msg = cutu ? 'Our app is motu, but you are a cutu.' : strong ? strongLine : '';
+    if (msg) setTimeout(() => { line.style.opacity = 0; setTimeout(() => { line.textContent = msg; line.style.opacity = 1; }, 160); }, 500);
+    setTimeout(finish, msg ? 2000 : 600); return;
   }
   const ease = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
   const tween = (from, to, dur) => new Promise(res => {
@@ -649,9 +672,11 @@ function splash() {
   fig.innerHTML = figureSVG(0, 150);
   (async () => {
     await wait(250);
-    say('The fit you is already in there.');
+    if (cutu) { say('Our app is motu, but you are a cutu.'); await wait(1700); }
+    say(fem ? 'Your goal body is already in there.' : 'The fit you is already in there.');
     await tween(0, 1, 1500);
     await wait(500);
+    if (strong) { say(strongLine); await wait(1200); finish(); return; }
     say(J.first ? (target > 0 ? `You're ${pct}% of the way there.` : "Day one. Let's go.") : 'Every motu has a comeback.');
     await tween(1, target, 800);
     await wait(900);
