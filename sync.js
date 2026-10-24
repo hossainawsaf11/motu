@@ -12,7 +12,9 @@
     messagingSenderId: '716446418246',
     appId: '1:716446418246:web:d3bbce40b33c52d768d147'
   };
-  const META_KEYS = ['settings', 'templates', 'exTypes', 'exUnits', 'weights', 'steps'];
+  const ENV = window.MOTU_ENV || {};
+  const ROOT = ENV.root || 'users';
+  const META_KEYS = ['settings', 'templates', 'exTypes', 'exUnits', 'weights', 'steps', 'profile', 'planName'];
   const LOCAL_ONLY_SETTINGS = ['lastBackup'];
 
   const SY = window.MotuSync = { user: null, state: 'off', lastSync: null, error: '' };
@@ -35,7 +37,7 @@
   // key-order-independent JSON, so cloud copies compare equal to local ones
   const stable = v => JSON.stringify(v, (k, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.keys(x).sort().reduce((o, key) => (o[key] = x[key], o), {}) : x);
   // ids this device knew the cloud had, so a workout deleted on another device isn't brought back
-  const ID_KEY = 'motu.syncedIds';
+  const ID_KEY = (ENV.key || 'motu') + '.syncedIds';
   const knownIds = uid => { try { const v = JSON.parse(localStorage.getItem(ID_KEY) || 'null'); return v && v.uid === uid ? new Set(v.ids) : new Set(); } catch (e) { return new Set(); } };
   const rememberIds = () => { try { if (SY.user) localStorage.setItem(ID_KEY, JSON.stringify({ uid: SY.user.uid, ids: Object.keys(synced.sessions) })); } catch (e) { } };
   // settings hold lists inside lists (weight checkpoints), which Firestore can't store, so meta travels as one JSON string
@@ -56,7 +58,7 @@
   /* ---------- first sign-in: merge this device with the cloud ---------- */
   async function firstMerge(uid) {
     setState('syncing');
-    const userRef = db.collection('users').doc(uid);
+    const userRef = db.collection(ROOT).doc(uid);
     const [metaSnap, sessSnap] = await Promise.all([userRef.get(), userRef.collection('sessions').get()]);
     const cloudSessions = {}; sessSnap.forEach(d => { cloudSessions[d.id] = d.data(); });
     const cloudKeys = new Set(Object.values(cloudSessions).map(sessKey).filter(Boolean));
@@ -99,7 +101,7 @@
 
   /* ---------- live updates from other devices ---------- */
   function listen(uid) {
-    const userRef = db.collection('users').doc(uid);
+    const userRef = db.collection(ROOT).doc(uid);
     unsubMeta = userRef.onSnapshot({ includeMetadataChanges: true }, snap => {
       if (!ready || !snap.exists || snap.metadata.hasPendingWrites) return;
       const cm = readMeta(snap.data()); if (!cm) return;
@@ -135,7 +137,7 @@
   /* ---------- push local changes ---------- */
   async function push() {
     if (!SY.user || !ready) return;
-    const userRef = db.collection('users').doc(SY.user.uid);
+    const userRef = db.collection(ROOT).doc(SY.user.uid);
     const batch = db.batch(); let n = 0;
     const now = {};
     for (const s of S.sessions) {

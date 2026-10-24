@@ -14,7 +14,7 @@
   };
   const ENV = window.MOTU_ENV || {};
   const ROOT = ENV.root || 'users';
-  const META_KEYS = ['settings', 'templates', 'exTypes', 'exUnits', 'weights', 'steps', 'profile'];
+  const META_KEYS = ['settings', 'templates', 'exTypes', 'exUnits', 'weights', 'steps', 'profile', 'planName'];
   const LOCAL_ONLY_SETTINGS = ['lastBackup'];
 
   const SY = window.MotuSync = { user: null, state: 'off', lastSync: null, error: '' };

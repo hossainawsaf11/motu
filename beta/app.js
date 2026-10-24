@@ -427,6 +427,7 @@ function viewHome() {
 
   if (backupDays == null || backupDays >= 7) h += `<button class="notice" data-act="export">${backupDays == null ? 'No backup yet.' : `Last backup ${backupDays} days ago.`} Your workouts live only on this phone. Tap to save a backup to Files.</button>`;
 
+  if (!S.profile && !S.fresh && S.sessions.length < 10 && !st.setupNudgeOff) h += `<div class="card setupnudge"><b>Make Motu yours</b><p class="muted">A few quick questions and you get a plan built for your goals.</p><div class="row2"><button class="btn" data-act="nudgeOff">Not now</button><button class="btn primary" data-act="setupRedo">Set up my plan</button></div></div>`;
   // journey
   if (strengthMode()) h += strengthCard();
   else if (J.first) {
@@ -525,7 +526,7 @@ function obPlan(d) {
   return { name: pr.name, days: pr.days.map(x => ({ ...cloneDay(x), ex: cloneDay(x).ex.slice(0, max) })) };
 }
 function onboard() {
-  if (!S.fresh) return;
+  if (!S.fresh && !(OB && OB.redo)) return;
   if (!OB) obInit();
   const el = $('#onboard'); if (!el) return;
   const d = OB.d, step = OB_STEPS[OB.step], g = pendingGift;
@@ -533,7 +534,7 @@ function onboard() {
   let body = '';
   if (step === 'name') body = `
     ${g ? `<div class="giftcard"><b>${g.from ? esc(g.from) + ' made a plan for you' : 'Someone made a plan for you'}</b>${g.note ? `<span>${esc(g.note)}</span>` : ''}<span class="muted sm">${esc(g.plan.name)} · ${g.plan.days.length} days</span></div>` : ''}
-    <h1>${g ? "Let's set you up" : 'Welcome to motu'}</h1><p class="obsub">Every motu has a comeback. A few quick questions and your plan is ready.</p>
+    <h1>${OB.redo ? "Let's build your plan" : g ? "Let's set you up" : 'Welcome to motu'}</h1><p class="obsub">Every motu has a comeback. A few quick questions and your plan is ready.</p>
     <label class="lbl">What should we call you?<input class="field" id="obName" data-in="ob" data-k="name" value="${esc(d.name)}" autocomplete="given-name" enterkeyhint="next"></label>`;
   if (step === 'gender') body = `<h1>Who's training?</h1><p class="obsub">This sets the starting mix of exercises.</p>
     <div class="obopts">${opt('gender', 'woman', 'Woman', d.gender === 'woman')}${opt('gender', 'man', 'Man', d.gender === 'man')}${opt('gender', 'other', 'Prefer not to say', d.gender === 'other')}</div>`;
@@ -579,7 +580,7 @@ function onboard() {
     ${OB.step === 0 ? `<div class="obfig">${figureSVG(0, 120)}</div>` : ''}
     ${body}
     <button class="btn primary big" data-act="${last ? 'obFinish' : 'obNext'}">${last ? 'Start my plan' : 'Next'}</button>
-    ${OB.step === 0 ? '<button class="quick dark" data-act="obSignIn">I already have an account</button>' : ''}
+    ${OB.step === 0 ? (OB.redo ? '<button class="quick dark" data-act="obCancel">Not now</button>' : '<button class="quick dark" data-act="obSignIn">I already have an account</button>') : ''}
   </div>`;
   el.hidden = false; document.body.classList.add('noscroll');
   el.scrollTop = 0;
@@ -1155,6 +1156,9 @@ function settingsModal() {
     <label class="lbl">Your name<input class="field" id="setName" data-in="setText" data-k="name" value="${esc(s.name || '')}" autocomplete="given-name"></label>
     <div class="lbl">Coach voice</div>
     <div class="seg">${[['kind', 'Kind'], ['tough', 'Tough']].map(([v, l]) => `<button class="${(s.voice || 'kind') === v ? 'on' : ''}" data-act="voice" data-v="${v}">${l}</button>`).join('')}</div>
+    <div class="lbl">Body figure</div>
+    <div class="seg">${[['man', 'Man'], ['woman', 'Woman']].map(([v, l]) => `<button class="${(S.profile && S.profile.gender === 'woman' ? 'woman' : 'man') === v ? 'on' : ''}" data-act="figure" data-v="${v}">${l}</button>`).join('')}</div>
+    <button class="btn wide" data-act="setupRedo">Answer the setup questions and get a new plan</button>
     <div class="lbl">Usually train at</div>
     <div class="seg">${[['gym', 'Gym'], ['home', 'Home']].map(([v, l]) => `<button class="${(s.defaultMode || 'gym') === v ? 'on' : ''}" data-act="place" data-p="${v}">${l}</button>`).join('')}</div>
     <div class="lbl">Units</div>
@@ -1222,12 +1226,23 @@ const ACT = {
     S.settings.weeklyTarget = days; S.settings.streakThreshold = Math.min(days, 4);
     S.settings.defaultMode = d.where === 'home' ? 'home' : 'gym';
     S.settings.goalWeight = goal > 0 ? k(goal) : k(now);
-    S.weights = [{ date: today(), kg: k(now) }];
+    if (OB.redo) { S.weights = S.weights.filter(w => w.date !== today()); S.weights.push({ date: today(), kg: k(now) }); S.weights.sort((a, b) => a.date.localeCompare(b.date)); }
+    else S.weights = [{ date: today(), kg: k(now) }];
     S.profile = { gender: d.gender, goals: d.goals, freq: d.freq, last7: d.last7, where: d.where, days, minutes: d.minutes, heightCm: heightCm ? Math.round(heightCm) : null, giftFrom: pendingGift && !OB.planKey ? pendingGift.from : null, createdAt: today() };
-    delete S.fresh; pendingGift = null; OB = null;
+    const redo = OB.redo; delete S.fresh; pendingGift = null; OB = null;
     save(); closeOnboard(); go('home');
-    toast(`Welcome, ${S.settings.name}. Your first workout is ready.`);
+    toast(redo ? 'Your new plan is ready. Your history stays.' : `Welcome, ${S.settings.name}. Your first workout is ready.`);
   },
+  obCancel: () => { OB = null; closeOnboard(); },
+  setupRedo: () => {
+    closeModal(); obInit(); OB.redo = true;
+    const d = OB.d, P = S.profile || {}, lw = latestWeight(), u = S.settings.unit || 'kg';
+    d.name = S.settings.name || ''; d.unit = u; d.gender = P.gender || ''; d.goals = P.goals || [];
+    if (lw) d.now = String(u === 'lb' ? Math.round(lw.kg * LB * 10) / 10 : lw.kg);
+    onboard();
+  },
+  nudgeOff: () => { S.settings.setupNudgeOff = true; save(); render(); },
+  figure: t => { S.profile = Object.assign({}, S.profile || {}, { gender: t.dataset.v }); save(); settingsModal(); render(); },
   obSignIn: () => { delete S.fresh; pendingGift = null; save(); closeOnboard(); settingsModal(); },
   editSteps: async () => {
     const v = await askText('Steps today', S.steps[today()] ?? '');
@@ -1270,7 +1285,7 @@ const ACT = {
   pbExMove: t => { const X = pbDraft.days[+t.dataset.d].ex, i = +t.dataset.x, m = +t.dataset.m; [X[i], X[i + m]] = [X[i + m], X[i]]; renderPB(); },
   pbUse: async () => {
     if (!pbDraft.days.length || !pbDraft.days.some(d => d.ex.some(x => (x.name || '').trim()))) return toast('Add at least one exercise');
-    if (!(await ask(`Use "${pbDraft.name || 'this plan'}" as your rotation? Your history stays.`, 'Use plan'))) { renderPB(); return; }
+    if (!(await ask(`This replaces your current rotation (${S.planName || S.templates.map(t => t.name).slice(0, 3).join(", ")}) with "${pbDraft.name || "this plan"}". Your workout history stays. Building a plan for someone else? Tap Cancel and use Send as a gift.`, 'Replace my plan', true))) { renderPB(); return; }
     applyPlan(pbDraft); save(); closeModal(); go('workout'); toast('Plan saved. Your next workout is ready.');
   },
   pbGift: async () => {

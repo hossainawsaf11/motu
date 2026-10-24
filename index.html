@@ -385,6 +385,62 @@ details.card summary::after{content:' ▾';color:var(--faint)}
 .ob .btn.big{margin-top:10px;box-shadow:none}
 .ob .field{background:var(--card)}
 .ob .seg{background:#E6EAE5}
+
+/* ---- gym / home ---- */
+.segrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.segrow .useg{margin-top:0}
+.exh-r{display:flex;align-items:center;gap:4px;flex:none}
+.placebtn{display:inline-flex;align-items:center;gap:4px;min-height:32px;padding:0 10px;border-radius:9px;background:var(--card2);color:var(--text);font-weight:800;font-size:12px}
+.placebtn.home{background:var(--green-soft);color:var(--green)}
+.placebtn svg{font-size:12px}
+
+/* ---- plan builder ---- */
+.plancard .btn{margin-top:12px}
+.pbday{background:var(--card2);border-radius:16px;padding:12px;margin:12px 0}
+.pbday-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pbday-h .field{flex:1;min-width:140px;background:var(--card);font-weight:700}
+.pbn{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pbmove{display:flex;gap:2px}
+.pbex{background:var(--card);border-radius:12px;padding:10px;margin:8px 0}
+.pbex .field{background:var(--card2)}
+.pbnums{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:6px}
+.pbnums label{font-size:10.5px;color:var(--muted);font-weight:700}
+.pbnums .field{min-height:40px;padding:6px 8px;text-align:center}
+.pbfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap}
+.pbbar{position:sticky;bottom:calc(-1 * var(--safe-b) - 24px);background:var(--card);display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 0 calc(var(--safe-b) + 4px);margin-top:8px;border-top:1px solid var(--line)}
+.pvday{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-bottom:1px solid var(--line)}
+.giftnote{background:var(--accent-soft);color:var(--accent-ink);border-radius:14px;padding:12px 14px;font-weight:600;line-height:1.45;margin:4px 0 8px;white-space:pre-line}
+.giftlink{font-size:12px;word-break:break-all}
+.fchips{display:flex;flex-wrap:wrap;gap:8px}
+.fchip{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 12px;border-radius:12px;background:var(--card2);font-weight:700;font-size:14px}
+
+/* ---- setup v2 ---- */
+.obtop{display:grid;grid-template-columns:60px 1fr 60px;align-items:center;margin-bottom:6px}
+.obdots{display:flex;gap:5px;justify-content:center}
+.obdots i{width:22px;height:5px;border-radius:99px;background:#DCE1DB}
+.obdots i.on{background:var(--accent)}
+.obsub{text-align:center;margin:0 0 10px;color:var(--muted);font-weight:600}
+.obopts{display:flex;flex-direction:column;gap:8px;margin:6px 0}
+.obopts.row{flex-direction:row;flex-wrap:wrap}
+.obopts.row .obopt{flex:1;min-width:56px;justify-content:center;flex-direction:column}
+.obopt{display:flex;align-items:center;gap:6px;min-height:52px;padding:0 16px;border-radius:14px;background:var(--card);font-weight:700;font-size:16px;text-align:left;border:2px solid transparent}
+.obopt.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink)}
+.obopt small{font-size:10.5px;font-weight:700;color:var(--muted)}
+.obnote{background:var(--green-soft);color:#0B4F44;border-radius:14px;padding:11px 13px;font-size:14px;font-weight:600;line-height:1.45;margin:8px 0}
+.obstep{display:flex;align-items:center;justify-content:center;gap:22px;margin:6px 0}
+.obstep button{width:52px;height:52px;border-radius:14px;background:var(--card);font-size:24px;font-weight:800}
+.obstep b{font-size:32px;font-family:var(--f-display);min-width:40px;text-align:center}
+.hseg{display:inline-flex;gap:4px;margin-left:8px}
+.hseg button{min-height:28px;padding:0 10px;border-radius:8px;background:var(--card);font-weight:800;font-size:12px;color:var(--muted)}
+.hseg button.on{background:var(--text);color:#fff}
+.obplan{background:var(--card);border-radius:16px;padding:4px 14px;margin:6px 0}
+.obplan .pvday:last-child{border-bottom:0}
+.fchip.on{background:var(--accent-soft);color:var(--accent-ink);box-shadow:inset 0 0 0 2px var(--accent)}
+.giftcard{display:flex;flex-direction:column;gap:4px;background:var(--accent-soft);color:var(--accent-ink);border-radius:16px;padding:14px 16px;margin-bottom:8px}
+.giftcard b{font-size:17px}
+.giftcard span{white-space:pre-line;line-height:1.45}
+.swin{font-size:13.5px;color:#0B4F44;background:var(--green-soft);border-radius:10px;padding:5px 9px;align-self:flex-start}
+.swin b{font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -403,11 +459,12 @@ details.card summary::after{content:' ▾';color:var(--faint)}
 <div id="onboard" hidden></div>
 <div id="splash"><div class="splfig"></div><div class="spln">motu</div><div class="splt">Every motu has a comeback.</div></div>
 <div id="toast"></div>
-<script src="seed.js?v=1.6"></script>
-<script src="app.js?v=1.6"></script>
+<script src="seed.js?v=20"></script>
+<script src="library.js?v=20"></script>
+<script src="app.js?v=20"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="sync.js?v=1.6"></script>
+<script src="sync.js?v=20"></script>
 </body>
 </html>
