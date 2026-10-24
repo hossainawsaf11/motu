@@ -38,6 +38,9 @@
   const ID_KEY = 'motu.syncedIds';
   const knownIds = uid => { try { const v = JSON.parse(localStorage.getItem(ID_KEY) || 'null'); return v && v.uid === uid ? new Set(v.ids) : new Set(); } catch (e) { return new Set(); } };
   const rememberIds = () => { try { if (SY.user) localStorage.setItem(ID_KEY, JSON.stringify({ uid: SY.user.uid, ids: Object.keys(synced.sessions) })); } catch (e) { } };
+  // settings hold lists inside lists (weight checkpoints), which Firestore can't store, so meta travels as one JSON string
+  const readMeta = d => { if (!d) return null; if (typeof d.metaJson === 'string') { try { return JSON.parse(d.metaJson); } catch (e) { return null; } } return d.meta || null; };
+  const metaDoc = () => ({ metaJson: JSON.stringify(metaOf()), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
   const sessKey = s => s.imported ? `imp|${s.date}|${s.name}` : null;
   const setState = (st, err) => { SY.state = st; SY.error = err || ''; paint(); };
 
@@ -67,8 +70,9 @@
       merged[s.id] = s;
     }
     // meta: cloud settings win; weigh-ins and steps are combined
-    if (metaSnap.exists && metaSnap.data().meta) {
-      const cm = metaSnap.data().meta, local = metaOf();
+    const cmRead = metaSnap.exists ? readMeta(metaSnap.data()) : null;
+    if (cmRead) {
+      const cm = cmRead, local = metaOf();
       const w = {}; for (const x of [...(local.weights || []), ...(cm.weights || [])]) w[x.date] = x;
       for (const k of META_KEYS) if (cm[k] != null) S[k] = cm[k];
       S.settings = { ...S.settings, ...cm.settings, lastBackup: S.settings.lastBackup };
@@ -81,7 +85,7 @@
     // upload anything the cloud doesn't have yet
     const batch = db.batch(); let n = 0;
     for (const s of S.sessions) if (!cloudSessions[s.id]) { batch.set(userRef.collection('sessions').doc(s.id), clean(s)); n++; }
-    batch.set(userRef, { meta: metaOf(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    batch.set(userRef, metaDoc());
     await batch.commit();
     for (const s of S.sessions) synced.sessions[s.id] = stable(clean(s));
     synced.meta = stable(metaOf());
@@ -97,7 +101,7 @@
     const userRef = db.collection('users').doc(uid);
     unsubMeta = userRef.onSnapshot({ includeMetadataChanges: true }, snap => {
       if (!ready || !snap.exists || snap.metadata.hasPendingWrites) return;
-      const cm = snap.data().meta; if (!cm) return;
+      const cm = readMeta(snap.data()); if (!cm) return;
       const js = stable(cm); if (js === synced.meta) return;
       for (const k of META_KEYS) if (cm[k] != null) S[k] = cm[k];
       S.settings = { ...S.settings, ...cm.settings };
@@ -139,7 +143,7 @@
     }
     for (const id of Object.keys(synced.sessions)) if (!now[id]) { batch.delete(userRef.collection('sessions').doc(id)); delete synced.sessions[id]; n++; }
     const m = metaOf(), mjs = stable(m);
-    if (mjs !== synced.meta) { batch.set(userRef, { meta: m, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }); synced.meta = mjs; n++; }
+    if (mjs !== synced.meta) { batch.set(userRef, metaDoc()); synced.meta = mjs; n++; }
     if (!n) return;
     setState('syncing');
     rememberIds();
@@ -192,6 +196,7 @@
       return `<div class="syncok"><b>Synced as ${esc(SY.user.email || 'your account')}</b>
         <span class="muted sm">${SY.state === 'error' ? esc(SY.error) : SY.state === 'synced' ? 'Up to date' + (t ? ' · ' + t : '') : 'Syncing...'}</span></div>
         <p class="muted sm">Every workout, weigh-in and step count saves to your account and shows up on all your devices.</p>
+        ${SY.state === 'error' ? '<button class="btn primary wide" data-act="syncRetry">Try again</button>' : ''}
         <button class="btn wide" data-act="syncOut">Sign out of this device</button>`;
     }
     return `<p class="muted sm">Sign in on each device and your workouts stay the same everywhere, backed up automatically.</p>
@@ -235,6 +240,11 @@
       if (standalone) await auth.signInWithRedirect(provider);
       else { await auth.signInWithPopup(provider); toast('Signed in. Syncing your workouts'); }
     } catch (err) { SY.error = friendly(err); paint(); }
+  };
+  ACT.syncRetry = async () => {
+    if (!SY.user) return;
+    if (unsubMeta) { unsubMeta(); unsubMeta = null; } if (unsubSess) { unsubSess(); unsubSess = null; }
+    try { await firstMerge(SY.user.uid); listen(SY.user.uid); toast('Synced'); } catch (err) { setState('error', err.message || String(err)); }
   };
   ACT.syncOut = async () => {
     if (!(await ask('Sign out of this device? Your workouts stay safe in your account.', 'Sign out'))) return;
